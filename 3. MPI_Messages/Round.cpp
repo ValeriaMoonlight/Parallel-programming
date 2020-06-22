@@ -5,7 +5,6 @@
 using namespace std;
 
 void MPI_Round() {
-
 	int rank, total;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &total);
@@ -28,17 +27,12 @@ void MPI_Round() {
 		cout << input[i] << "\t";
 	}
 	cout << endl;
-
-
 }
 
 int main(int argc, char** argv) {
 
 	MPI_Init(NULL, NULL);
-
 	MPI_Round();
-	
 	MPI_Finalize();
-
 	return 0;
 }
