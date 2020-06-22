@@ -5,8 +5,6 @@
 using namespace std;
 
 void MPI_Shift() {
-
-
 	int rank, total;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &total);
@@ -35,16 +33,11 @@ void MPI_Shift() {
 		cout << input[i] << "\t";
 	}
 	cout << endl;
-
 }
 
 int main(int argc, char** argv) {
-
 	MPI_Init(NULL, NULL);
-
 	MPI_Shift();
-
 	MPI_Finalize();
-
 	return 0;
 }
