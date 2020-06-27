@@ -3,6 +3,7 @@
 #include <fstream>
 #include <ctime>
 #include <mpi.h>
+#include <Windows.h>
 
 //Максимальное значение веса = 100
 #define INF 101
@@ -54,20 +55,19 @@ int main(int argc, char** argv) {
 	MPI_Status status;
 
 	if (rank == ROOT_PROC) {
-		numberOfVert = 5;
+		numberOfVert = 500;
 		int *matrix;
 
+		cout << "Size: " << numberOfVert << endl;
 		matrix=randomMatrixForFloyd(numberOfVert, rank);
-
-		cout << "Root process. Number of vertex sent to other processes" << endl;
+		int time = GetTickCount();
+		
 		//Раздать процессам количество вершин
 		MPI_Bcast(&numberOfVert, 1, MPI_INT, ROOT_PROC, MPI_COMM_WORLD);
-
-		cout << "Root process. Print first matrix:" << endl;
-		printMatrix(matrix, numberOfVert);
+				
+		//printMatrix(matrix, numberOfVert);
 
 		//Раздать каждому процессу нужно количество строк матрицы
-
 		//Вычислить по сколько строк отдать каждому процессу
 		int workSize = size - 1;//(руту не отдаем)
 		int *rowCounts = (int*)malloc(sizeof(int) * workSize);
@@ -85,16 +85,14 @@ int main(int argc, char** argv) {
 			rowCounts[workSize - 1] = numberOfVert - ((numberOfVert / workSize) * (workSize - 1));
 		}
 
-		cout << "Root process. Row counts sent to other processes" << endl;
 		//Сказать каждому процессу сколько ему ждать строк
 		for (int i = 1; i < size; i++) {
 			MPI_Send(&rowCounts[i - 1], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
 		}
 
-		cout << "Root process. Main loop start" << endl;
 		//Основной цикл алгоритма Флойда
 		for (int k = 0; k < numberOfVert; k++) {
-			//Раздаем k-ую строку всем процессам(кроме рута)
+			//Раздаем k-ую строку всем процессам
 			for (int p = 1; p < size; p++) {
 				MPI_Isend(&matrix[k*numberOfVert], numberOfVert, MPI_INT, p, 0, MPI_COMM_WORLD, &request);
 			}
@@ -118,9 +116,10 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		cout << "Root process. Print final matrix:" << endl;
-		printMatrix(matrix, numberOfVert);
+		//printMatrix(matrix, numberOfVert);
 
+		cout << "Time: " << GetTickCount() - time << endl;
+		
 		free(matrix);
 	}
 	else {
@@ -130,13 +129,10 @@ int main(int argc, char** argv) {
 		//Получить количество строк, которые нужно будет изменить
 		int rowCount;
 		MPI_Recv(&rowCount, 1, MPI_INT, ROOT_PROC, 0, MPI_COMM_WORLD, &status);
-		cout << rank << " : " << rowCount << endl;
 
 		//Выделить память
 		int *kRow = (int *)malloc(sizeof(int) * numberOfVert);
-		//int *kRow = new int[numberOfVert];
 		int *rows = (int *)malloc(sizeof(int) * (rowCount * numberOfVert));
-		//int *rows = new int[rowCount * numberOfVert];
 
 		//Основной цикл алгоритма Флойда
 		for (int k = 0; k < numberOfVert; k++) {
@@ -158,7 +154,7 @@ int main(int argc, char** argv) {
 				}
 			}
 
-			//Отправить изменения руту
+			
 			for (int i = 0; i < rowCount; i++) {
 				MPI_Send(&rows[i*numberOfVert], numberOfVert, MPI_INT, ROOT_PROC, 0, MPI_COMM_WORLD);
 			}
