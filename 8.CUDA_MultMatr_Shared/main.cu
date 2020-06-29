@@ -14,9 +14,6 @@ void Error(cudaError_t err) {
 	}
 }
 
-__global__ void kernel() {
-}
-
 __global__ void matMult(int *A, int *B, int *C, int N) {
 
 	int A_begin = N * SIZE_OF_BLOCK;
