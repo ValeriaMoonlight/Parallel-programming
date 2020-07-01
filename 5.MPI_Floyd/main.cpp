@@ -5,15 +5,12 @@
 #include <mpi.h>
 #include <Windows.h>
 
-//Максимальное значение веса = 100
 #define INF 101
 #define ROOT_PROC 0
 
 using namespace std;
 
 int * randomMatrixForFloyd(int count, int rankProcess) {
-	//Матрица смежности с весами ребер графа(101 - ребра нет, 0 ребро в себя)
-	//Матрица будет лежать в строку, чтобы проще было передавать процессам
 	int *buffer = new int[count * count];
 	srand(time(NULL) + rankProcess);
 	for (int i = 0; i < count; i++) {
@@ -62,89 +59,68 @@ int main(int argc, char** argv) {
 		matrix=randomMatrixForFloyd(numberOfVert, rank);
 		int time = GetTickCount();
 		
-		//Раздать процессам количество вершин
 		MPI_Bcast(&numberOfVert, 1, MPI_INT, ROOT_PROC, MPI_COMM_WORLD);
 				
 		//printMatrix(matrix, numberOfVert);
-
-		//Раздать каждому процессу нужно количество строк матрицы
-		//Вычислить по сколько строк отдать каждому процессу
-		int workSize = size - 1;//(руту не отдаем)
+		int workSize = size - 1;
 		int *rowCounts = (int*)malloc(sizeof(int) * workSize);
-		//int *rowCounts = new int[workSize];
-
+		
 		for (int i = 0; i < workSize - 1; i++) {
 			rowCounts[i] = numberOfVert / workSize;
 		}
-		//Если поровну делится то последнему столько же
+		
 		if (numberOfVert % workSize == 0) {
 			rowCounts[workSize - 1] = numberOfVert / workSize;
 		}
-		//Если не поровну, то в последний скидываем остатки
 		else {
 			rowCounts[workSize - 1] = numberOfVert - ((numberOfVert / workSize) * (workSize - 1));
 		}
 
-		//Сказать каждому процессу сколько ему ждать строк
 		for (int i = 1; i < size; i++) {
 			MPI_Send(&rowCounts[i - 1], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
 		}
 
-		//Основной цикл алгоритма Флойда
 		for (int k = 0; k < numberOfVert; k++) {
-			//Раздаем k-ую строку всем процессам
 			for (int p = 1; p < size; p++) {
 				MPI_Isend(&matrix[k*numberOfVert], numberOfVert, MPI_INT, p, 0, MPI_COMM_WORLD, &request);
 			}
 
-			//Отдать каждому процессу его строки матрицы
-			int num = 0; //Номер строки
-			for (int i = 0; i < workSize; i++) { //Бежим по массиву с кол-вом строк
-				for (int j = 0; j < rowCounts[i]; j++) { //Отдаем нужное количество строк
+			int num = 0;
+			for (int i = 0; i < workSize; i++) { 
+				for (int j = 0; j < rowCounts[i]; j++) { 
 					MPI_Isend(&matrix[num*numberOfVert], numberOfVert, MPI_INT, i + 1, 0, MPI_COMM_WORLD, &request);
 					num++;
 				}
 			}
 
-			//Получаем от процессов строки, измененные на этой итерации
-			num = 0; //Номер строки
-			for (int i = 0; i < workSize; i++) { //Бежим по массиву с кол-вом строк
-				for (int j = 0; j < rowCounts[i]; j++) { //Принимаем нужное количество строк
+			num = 0;
+			for (int i = 0; i < workSize; i++) { 
+				for (int j = 0; j < rowCounts[i]; j++) { 
 					MPI_Recv(&matrix[num*numberOfVert], numberOfVert, MPI_INT, i + 1, 0, MPI_COMM_WORLD, &status);
 					num++;
 				}
 			}
 		}
-
 		//printMatrix(matrix, numberOfVert);
-
 		cout << "Time: " << GetTickCount() - time << endl;
-		
 		free(matrix);
 	}
 	else {
-		//Получить количество вершин
 		MPI_Bcast(&numberOfVert, 1, MPI_INT, ROOT_PROC, MPI_COMM_WORLD);
 
-		//Получить количество строк, которые нужно будет изменить
 		int rowCount;
 		MPI_Recv(&rowCount, 1, MPI_INT, ROOT_PROC, 0, MPI_COMM_WORLD, &status);
 
-		//Выделить память
 		int *kRow = (int *)malloc(sizeof(int) * numberOfVert);
 		int *rows = (int *)malloc(sizeof(int) * (rowCount * numberOfVert));
 
-		//Основной цикл алгоритма Флойда
 		for (int k = 0; k < numberOfVert; k++) {
-			//Получить k-ю строку
 			MPI_Recv(kRow, numberOfVert, MPI_INT, ROOT_PROC, 0, MPI_COMM_WORLD, &status);
 
-			//Получить свои строки из матрицы
 			for (int i = 0; i < rowCount; i++) {
 				MPI_Recv(&rows[i*numberOfVert], numberOfVert, MPI_INT, ROOT_PROC, 0, MPI_COMM_WORLD, &status);
 			}
 
-			//Изменить нужные строки в матрице(параллельная работа)
 			for (int i = 0; i < rowCount; i++) {
 				for (int j = 0; j < numberOfVert; j++) {
 					rows[i*numberOfVert + j] = min(
